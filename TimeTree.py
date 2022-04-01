@@ -4,9 +4,16 @@ class TimeTree:
     def __init__(self, name: str, versions : 'dict[int, list[TimeTreeVersion]]' = {}):
         self.name = name
         self.versions = versions
-    
+        self.time_tree_versions = {}
+
+        for version_number, dependencies in versions.items():
+            for dependency in dependencies:
+                dependency.add_parent(self.get_version(version_number))
+
     def get_version(self, version : int):
-        return TimeTreeVersion(self, version, self.versions[version])
+        if version not in self.time_tree_versions:
+            self.time_tree_versions[version] = TimeTreeVersion(self, version, self.versions[version])
+        return self.time_tree_versions[version]
 
     def __str__(self):
         return f"{self.name}"
@@ -19,6 +26,10 @@ class TimeTreeVersion:
         self.time_tree = time_tree
         self.version = version
         self.dependencies = dependencies
+        self.parents : 'list[TimeTree]' = []
+
+    def add_parent(self, parent : TimeTree):
+        self.parents.append(parent)
 
     @property
     def name(self):
@@ -55,17 +66,61 @@ class TimeTreeVersion:
         
         return contraditions
 
-def draw_simple_time_tree(time_tree_version : 'TimeTreeVersion', contradictions: 'list[TimeTree]' = None, dot : 'Digraph' = None):
-    if contradictions is None:
-        contradictions = time_tree_version.get_contradictions()
+    def get_ancestors(self):
+        ancestors = []
+        for i in self.parents:
+            ancestors.append(i)
+            ancestors+=i.get_ancestors()
+        return ancestors
 
+    def find_commonalities(self, other : 'TimeTreeVersion') -> 'set[TimeTreeVersion]':
+        return set(self.get_ancestors()).intersection(set(other.get_ancestors()))
+
+    def find_commonalities_under(self, a: 'TimeTreeVersion', b: 'TimeTreeVersion') -> 'set[TimeTreeVersion]':
+        to_return = set(self.get_all_dependency_versions()).intersection(a.find_commonalities(b))
+        if (len(to_return) != 0):
+            to_return.add(self)
+        return to_return
+
+    def find_lowest_commonalities(self, a: 'TimeTreeVersion', b: 'TimeTreeVersion') -> 'set[TimeTreeVersion]':
+        commonalities = self.find_commonalities_under(a, b)
+        to_return = []
+        for commonality in commonalities:
+                    
+
+
+    # def distance_ordering(self, to_order: 'set[TimeTreeVersion]') -> 'list[list[TimeTreeVersion]]':
+    #     assert self in to_order
+    #     to_return = [[self]]
+    #     current_level_matches = []
+    #     current_level = self.dependencies
+    #     next_level = []
+    #     while True:
+    #         for i in current_level:
+    #             if i in to_order:
+    #                 current_level_matches.append(i)
+    #             next_level += i.dependencies
+            
+    #         to_return.append(current_level_matches)
+    #         current_level_matches = []
+    #         current_level = next_level
+    #         next_level = []
+
+
+def draw_simple_time_tree(time_tree_version : 'TimeTreeVersion', show_contradictions = True, contradictions: 'list[TimeTree]' = None, dot : 'Digraph' = None):
+    if contradictions is None:
+        if show_contradictions:
+            contradictions = time_tree_version.get_contradictions()
+        else:
+            contradictions = []
+            
     if (dot is None):
         dot = Digraph()
         dot.node(name=str(time_tree_version), label=str(time_tree_version))
         
 
     for child in time_tree_version.dependencies:
-        color = "red" if child.time_tree in contradictions else "black"
+        color = "red" if child.time_tree in contradictions and show_contradictions else "black"
         dot.node(name=str(child), label=str(child), color=color)
         dot.edge(str(time_tree_version), str(child))
         dot = draw_simple_time_tree(child, dot=dot, contradictions = contradictions)
@@ -81,13 +136,6 @@ def draw_total_time_tree(all_time_trees : 'list[TimeTree]'):
             version = time_tree.get_version(version_number)
             dot.node(name = str(version), label = str(version))
             dot.edge(str(time_tree), str(version), style="dashed", arrowhead="none")
-            draw_simple_time_tree(version, dot = dot)
+            draw_simple_time_tree(version, show_contradictions=False, dot = dot)
     
     return dot
-
-d = TimeTree("D", versions = {1: []})
-b = TimeTree("B", versions = {1 : [d.get_version(1)], 2: [d.get_version(1)]})
-c = TimeTree("C", versions = {1 : [d.get_version(1)]})
-a = TimeTree("A", versions = {1 : [b.get_version(1), c.get_version(1)], 2: [b.get_version(2)]})
-
-print(a.get_version(1).get_contradictions())
