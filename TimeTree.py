@@ -50,6 +50,9 @@ class TimeTreeVersion:
     def __hash__(self) -> int:
         return hash((self.version, self.time_tree.name))
 
+    '''
+    Get all descendents of the current time tree.
+    '''
     def get_all_dependency_versions(self):
         to_return = set()
         for dependency in self.dependencies:
@@ -57,6 +60,10 @@ class TimeTreeVersion:
             to_return.update(dependency.get_all_dependency_versions())
         return to_return
     
+    '''
+    Get all contradictions under this time tree.
+    A contradiction is when two versions of the same time tree are under the same parent.
+    '''
     def get_contradictions(self):
         all_dependencies = {}
         contraditions = set()
@@ -69,6 +76,9 @@ class TimeTreeVersion:
         
         return contraditions
 
+    '''
+    Get all nodes for whom this node is a descendant.
+    '''
     def get_ancestors(self):
         ancestors = []
         for i in self.parents:
@@ -76,39 +86,46 @@ class TimeTreeVersion:
             ancestors+=i.get_ancestors()
         return ancestors
 
+    '''
+    Get all nodes that have both the current node and the other node as a descendant.
+    '''
     def find_commonalities(self, other : 'TimeTreeVersion') -> 'set[TimeTreeVersion]':
         return set(self.get_ancestors()).intersection(set(other.get_ancestors()))
 
+    '''
+    Get all nodes under the current node that have both a and b as descendents.
+    '''
     def find_commonalities_under(self, a: 'TimeTreeVersion', b: 'TimeTreeVersion') -> 'set[TimeTreeVersion]':
         to_return = set(self.get_all_dependency_versions()).intersection(a.find_commonalities(b))
         if (len(to_return) != 0):
             to_return.add(self)
         return to_return
 
+    '''
+    Get all nodes under the current node for whom all of the below is true:
+    1. Have A and B as descendents (see find_commonalities_under)
+    2. One of the following is true:
+        a. There are no other commonalities beneath it
+        b. There is 1+ commonality beneath it, but there is also a node that is an ancestor of either a or b that is not a commonality beneath it and not part of the contradition
+    '''
     def find_lowest_commonalities(self, a: 'TimeTreeVersion', b: 'TimeTreeVersion') -> 'set[TimeTreeVersion]':
         commonalities = self.find_commonalities_under(a, b)
+        a_ancestors = a.get_ancestors()
+        b_ancestors = b.get_ancestors()
         to_return = []
+
         for commonality in commonalities:
-            pass
-
-
-    # def distance_ordering(self, to_order: 'set[TimeTreeVersion]') -> 'list[list[TimeTreeVersion]]':
-    #     assert self in to_order
-    #     to_return = [[self]]
-    #     current_level_matches = []
-    #     current_level = self.dependencies
-    #     next_level = []
-    #     while True:
-    #         for i in current_level:
-    #             if i in to_order:
-    #                 current_level_matches.append(i)
-    #             next_level += i.dependencies
+            commonality_as_child = False
+            ancestor_as_child = False
+            for child in commonality.dependencies:
+                if child in commonalities:
+                    commonality_as_child = True
+                elif child in a_ancestors or child in b_ancestors:
+                    ancestor_as_child = True
             
-    #         to_return.append(current_level_matches)
-    #         current_level_matches = []
-    #         current_level = next_level
-    #         next_level = []
-
+            if (ancestor_as_child or not commonality_as_child):
+                to_return.append(commonality)
+        return to_return
 
 def draw_simple_time_tree(time_tree_version : 'TimeTreeVersion', show_contradictions = True, contradictions: 'list[TimeTree]' = None, dot : 'Digraph' = None):
     if contradictions is None:
@@ -142,3 +159,10 @@ def draw_total_time_tree(all_time_trees : 'list[TimeTree]'):
             draw_simple_time_tree(version, show_contradictions=False, dot = dot)
     
     return dot
+
+d = TimeTree("D", versions = {1: [], 2: []})
+c = TimeTree("C", versions = {1: [d[1], d[2]]})
+b = TimeTree("B", versions= {1 : [c[1]]})
+a = TimeTree("A", versions = {1 : [b[1]]})
+
+print(a[1].find_lowest_commonalities(d[1], d[2]))
