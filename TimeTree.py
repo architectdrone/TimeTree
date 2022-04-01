@@ -21,6 +21,9 @@ class TimeTree:
     def __repr__(self):
         return str(self)
 
+    def __getitem__(self, i):
+        return self.get_version(i)
+
 class TimeTreeVersion:
     def __init__(self, time_tree: 'TimeTreeVersion', version : int, dependencies : 'list[TimeTreeVersion]'):
         self.time_tree = time_tree
@@ -86,7 +89,7 @@ class TimeTreeVersion:
         commonalities = self.find_commonalities_under(a, b)
         to_return = []
         for commonality in commonalities:
-                    
+            pass
 
 
     # def distance_ordering(self, to_order: 'set[TimeTreeVersion]') -> 'list[list[TimeTreeVersion]]':
